@@ -37,5 +37,14 @@
     "headless",
     "expo"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Ismael Castillo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cazismael/react-native-headless-tour"
+  },
+  "homepage": "https://github.com/cazismael/react-native-headless-tour#readme",
+  "bugs": {
+    "url": "https://github.com/cazismael/react-native-headless-tour/issues"
+  }
 }
