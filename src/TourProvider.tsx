@@ -5,17 +5,18 @@ import type { TourProviderProps } from './types';
 
 export function TourProvider({
   tourId,
+  steps,
   onStart,
   onStepChange,
   onComplete,
   children,
 }: TourProviderProps): ReactElement {
   useEffect(() => {
-    registry.registerTour(tourId, { onStart, onStepChange, onComplete });
+    registry.registerTour(tourId, { onStart, onStepChange, onComplete }, steps);
     return () => {
       registry.unregisterTour(tourId);
     };
-  }, [tourId, onStart, onStepChange, onComplete]);
+  }, [tourId, steps, onStart, onStepChange, onComplete]);
 
   return <Fragment>{children}</Fragment>;
 }

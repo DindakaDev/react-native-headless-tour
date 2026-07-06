@@ -12,24 +12,24 @@ afterEach(() => {
   registry.unregisterTour('test-provider');
 });
 
-it('calls registerTour on mount with correct tourId and callbacks', () => {
+it('calls registerTour on mount with correct tourId, callbacks, and steps', () => {
   const onStart = jest.fn();
   const onComplete = jest.fn();
   render(
-    <TourProvider tourId="test-provider" onStart={onStart} onComplete={onComplete}>
+    <TourProvider tourId="test-provider" steps={['a', 'b']} onStart={onStart} onComplete={onComplete}>
       <Text>child</Text>
     </TourProvider>,
   );
-  expect(registry.registerTour).toHaveBeenCalledWith('test-provider', {
-    onStart,
-    onStepChange: undefined,
-    onComplete,
-  });
+  expect(registry.registerTour).toHaveBeenCalledWith(
+    'test-provider',
+    { onStart, onStepChange: undefined, onComplete },
+    ['a', 'b'],
+  );
 });
 
 it('calls unregisterTour on unmount', () => {
   const { unmount } = render(
-    <TourProvider tourId="test-provider">
+    <TourProvider tourId="test-provider" steps={[]}>
       <Text>child</Text>
     </TourProvider>,
   );
@@ -39,7 +39,7 @@ it('calls unregisterTour on unmount', () => {
 
 it('renders children without a wrapping View', () => {
   const { getByText } = render(
-    <TourProvider tourId="test-provider">
+    <TourProvider tourId="test-provider" steps={[]}>
       <Text>hello</Text>
     </TourProvider>,
   );
