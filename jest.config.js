@@ -8,5 +8,5 @@ module.exports = {
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|react-navigation|@react-navigation/.*))',
   ],
   testMatch: ['**/__tests__/**/*.{ts,tsx}'],
-  setupFilesAfterFramework: ['@testing-library/react-native/extend-expect'],
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 };
