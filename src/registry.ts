@@ -16,6 +16,7 @@ export interface TourSnapshot {
 
 interface TourInstance {
   callbacks: TourCallbacks;
+  configuredSteps: string[];
   steps: Map<string, TourStep>;
   stepRefs: Map<string, RefObject<View>>;
   state: TourState;
@@ -29,6 +30,7 @@ function getOrCreate(tourId: string): TourInstance {
   if (!tours.has(tourId)) {
     tours.set(tourId, {
       callbacks: {},
+      configuredSteps: [],
       steps: new Map(),
       stepRefs: new Map(),
       state: { isActive: false, currentIndex: 0, orderedStepIds: [] },
@@ -66,9 +68,10 @@ export function getSnapshot(tourId: string): TourSnapshot {
   return instance.snapshot;
 }
 
-export function registerTour(tourId: string, callbacks: TourCallbacks): void {
+export function registerTour(tourId: string, callbacks: TourCallbacks, steps: string[]): void {
   const instance = getOrCreate(tourId);
   instance.callbacks = callbacks;
+  instance.configuredSteps = steps;
 }
 
 export function unregisterTour(tourId: string): void {
@@ -111,10 +114,7 @@ export function updateLayout(
 export function start(tourId: string): void {
   const instance = tours.get(tourId);
   if (!instance) return;
-  const orderedStepIds = Array.from(instance.steps.values())
-    .sort((a, b) => a.order - b.order)
-    .map((s) => s.id);
-  instance.state = { isActive: true, currentIndex: 0, orderedStepIds };
+  instance.state = { isActive: true, currentIndex: 0, orderedStepIds: instance.configuredSteps };
   instance.callbacks.onStart?.();
   notify(tourId);
 }

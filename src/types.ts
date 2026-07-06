@@ -9,7 +9,6 @@ export interface StepLayout {
 
 export interface TourStep<TMeta extends Record<string, unknown> = Record<string, unknown>> {
   id: string;
-  order: number;
   metadata: TMeta;
   layout: StepLayout | null;
 }
@@ -34,13 +33,13 @@ export interface TourControls {
 
 export interface TourProviderProps extends TourCallbacks {
   tourId: string;
+  steps: string[];
   children: ReactNode;
 }
 
 export interface TourStepProps<TMeta extends Record<string, unknown> = Record<string, unknown>> {
   tourId: string;
   stepId: string;
-  order: number;
   metadata: TMeta;
   children: ReactElement;
 }

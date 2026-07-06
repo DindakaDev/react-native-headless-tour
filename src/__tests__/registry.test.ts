@@ -32,9 +32,9 @@ afterEach(() => {
 });
 
 describe('registerTour / unregisterTour', () => {
-  it('registerTour stores callbacks; getSnapshot returns empty state', () => {
+  it('registerTour stores callbacks and steps; getSnapshot returns empty state', () => {
     const onStart = jest.fn();
-    registry.registerTour('test', { onStart });
+    registry.registerTour('test', { onStart }, ['a', 'b']);
     const snap = registry.getSnapshot('test');
     expect(snap.state.isActive).toBe(false);
     expect(snap.state.currentIndex).toBe(0);
@@ -42,9 +42,9 @@ describe('registerTour / unregisterTour', () => {
   });
 
   it('unregisterTour cleans up; getSnapshot returns fresh default after re-register', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, ['a']);
     registry.unregisterTour('test');
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, []);
     const snap = registry.getSnapshot('test');
     expect(snap.state.isActive).toBe(false);
   });
@@ -52,18 +52,18 @@ describe('registerTour / unregisterTour', () => {
 
 describe('registerStep / unregisterStep', () => {
   it('registerStep adds step with null layout', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, ['step-1']);
     const ref = makeRef();
-    registry.registerStep('test', { id: 'step-1', order: 1, metadata: {}, layout: null }, ref);
+    registry.registerStep('test', { id: 'step-1', metadata: {}, layout: null }, ref);
     const snap = registry.getSnapshot('test');
     expect(snap.steps.has('step-1')).toBe(true);
     expect(snap.steps.get('step-1')!.layout).toBeNull();
   });
 
   it('unregisterStep removes step', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, ['step-1']);
     const ref = makeRef();
-    registry.registerStep('test', { id: 'step-1', order: 1, metadata: {}, layout: null }, ref);
+    registry.registerStep('test', { id: 'step-1', metadata: {}, layout: null }, ref);
     registry.unregisterStep('test', 'step-1');
     expect(registry.getSnapshot('test').steps.has('step-1')).toBe(false);
   });
@@ -71,9 +71,9 @@ describe('registerStep / unregisterStep', () => {
 
 describe('updateLayout', () => {
   it('stores layout on step', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, ['step-1']);
     const ref = makeRef();
-    registry.registerStep('test', { id: 'step-1', order: 1, metadata: {}, layout: null }, ref);
+    registry.registerStep('test', { id: 'step-1', metadata: {}, layout: null }, ref);
     registry.updateLayout('test', 'step-1', { x: 10, y: 20, width: 100, height: 50 });
     const step = registry.getSnapshot('test').steps.get('step-1')!;
     expect(step.layout).toEqual({ x: 10, y: 20, width: 100, height: 50 });
@@ -81,11 +81,11 @@ describe('updateLayout', () => {
 });
 
 describe('start', () => {
-  it('sets isActive=true, currentIndex=0, sorts steps by order', () => {
+  it('sets isActive=true, currentIndex=0, orders steps per configured `steps` array', () => {
     const onStart = jest.fn();
-    registry.registerTour('test', { onStart });
-    registry.registerStep('test', { id: 'b', order: 2, metadata: {}, layout: null }, makeRef());
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerTour('test', { onStart }, ['a', 'b']);
+    registry.registerStep('test', { id: 'b', metadata: {}, layout: null }, makeRef());
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     registry.start('test');
     const { state } = registry.getSnapshot('test');
     expect(state.isActive).toBe(true);
@@ -93,38 +93,67 @@ describe('start', () => {
     expect(state.orderedStepIds).toEqual(['a', 'b']);
     expect(onStart).toHaveBeenCalledTimes(1);
   });
+
+  it('includes stepIds in orderedStepIds even if not yet registered (cross-screen navigation gap)', () => {
+    registry.registerTour('test', {}, ['a', 'b', 'c']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
+    registry.start('test');
+    const { state } = registry.getSnapshot('test');
+    expect(state.orderedStepIds).toEqual(['a', 'b', 'c']);
+  });
 });
 
 describe('next', () => {
   it('increments currentIndex and calls onStepChange', () => {
     const onStepChange = jest.fn();
-    registry.registerTour('test', { onStepChange });
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
-    registry.registerStep('test', { id: 'b', order: 2, metadata: {}, layout: null }, makeRef());
+    registry.registerTour('test', { onStepChange }, ['a', 'b']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
+    registry.registerStep('test', { id: 'b', metadata: {}, layout: null }, makeRef());
     registry.start('test');
     registry.next('test');
     expect(registry.getSnapshot('test').state.currentIndex).toBe(1);
     expect(onStepChange).toHaveBeenCalledWith(1);
   });
 
-  it('calls onComplete and sets isActive=false on last step', () => {
+  it('calls onComplete and sets isActive=false on last configured step', () => {
     const onComplete = jest.fn();
-    registry.registerTour('test', { onComplete });
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerTour('test', { onComplete }, ['a']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     registry.start('test');
     registry.next('test');
     const { state } = registry.getSnapshot('test');
     expect(state.isActive).toBe(false);
     expect(onComplete).toHaveBeenCalledTimes(1);
   });
+
+  it('advances past a step whose target has not mounted yet, without completing early', () => {
+    // Regression test: simulates navigating from screen A to screen B — step 'b'
+    // is configured but its TourStep hasn't mounted (registered) yet when next() fires.
+    const onComplete = jest.fn();
+    registry.registerTour('test', { onComplete }, ['a', 'b']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
+    registry.start('test');
+
+    registry.unregisterStep('test', 'a'); // screen A unmounts mid-navigation
+    registry.next('test'); // advance toward 'b', which isn't registered yet
+
+    const { state, steps } = registry.getSnapshot('test');
+    expect(state.isActive).toBe(true);
+    expect(state.currentIndex).toBe(1);
+    expect(steps.has('b')).toBe(false);
+    expect(onComplete).not.toHaveBeenCalled();
+
+    registry.registerStep('test', { id: 'b', metadata: {}, layout: null }, makeRef()); // screen B mounts
+    expect(registry.getSnapshot('test').steps.get('b')?.id).toBe('b');
+  });
 });
 
 describe('previous', () => {
   it('decrements currentIndex and calls onStepChange', () => {
     const onStepChange = jest.fn();
-    registry.registerTour('test', { onStepChange });
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
-    registry.registerStep('test', { id: 'b', order: 2, metadata: {}, layout: null }, makeRef());
+    registry.registerTour('test', { onStepChange }, ['a', 'b']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
+    registry.registerStep('test', { id: 'b', metadata: {}, layout: null }, makeRef());
     registry.start('test');
     registry.next('test');
     registry.previous('test');
@@ -133,8 +162,8 @@ describe('previous', () => {
   });
 
   it('clamps at index 0', () => {
-    registry.registerTour('test', {});
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerTour('test', {}, ['a']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     registry.start('test');
     registry.previous('test');
     expect(registry.getSnapshot('test').state.currentIndex).toBe(0);
@@ -143,8 +172,8 @@ describe('previous', () => {
 
 describe('stop', () => {
   it('sets isActive=false', () => {
-    registry.registerTour('test', {});
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerTour('test', {}, ['a']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     registry.start('test');
     registry.stop('test');
     expect(registry.getSnapshot('test').state.isActive).toBe(false);
@@ -154,9 +183,9 @@ describe('stop', () => {
 describe('refresh', () => {
   it('calls measureInWindow on all step refs', () => {
     const measureInWindow = jest.fn();
-    registry.registerTour('test', {});
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef(measureInWindow));
-    registry.registerStep('test', { id: 'b', order: 2, metadata: {}, layout: null }, makeRef(measureInWindow));
+    registry.registerTour('test', {}, ['a', 'b']);
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef(measureInWindow));
+    registry.registerStep('test', { id: 'b', metadata: {}, layout: null }, makeRef(measureInWindow));
     registry.refresh('test');
     expect(measureInWindow).toHaveBeenCalledTimes(2);
   });
@@ -164,35 +193,35 @@ describe('refresh', () => {
 
 describe('subscribe / notify / getSnapshot stability', () => {
   it('calls listener when state changes', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, ['a']);
     const listener = jest.fn();
     const unsub = registry.subscribe('test', listener);
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     expect(listener).toHaveBeenCalled();
     unsub();
   });
 
   it('getSnapshot returns same reference between notifications', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, []);
     const snap1 = registry.getSnapshot('test');
     const snap2 = registry.getSnapshot('test');
     expect(snap1).toBe(snap2);
   });
 
   it('getSnapshot returns new reference after notify', () => {
-    registry.registerTour('test', {});
+    registry.registerTour('test', {}, ['a']);
     const snap1 = registry.getSnapshot('test');
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     const snap2 = registry.getSnapshot('test');
     expect(snap1).not.toBe(snap2);
   });
 
   it('tours with different tourIds are independent', () => {
-    registry.registerTour('test', {});
-    registry.registerTour('other', {});
+    registry.registerTour('test', {}, ['a']);
+    registry.registerTour('other', {}, []);
     const listener = jest.fn();
     registry.subscribe('other', listener);
-    registry.registerStep('test', { id: 'a', order: 1, metadata: {}, layout: null }, makeRef());
+    registry.registerStep('test', { id: 'a', metadata: {}, layout: null }, makeRef());
     expect(listener).not.toHaveBeenCalled();
   });
 });
