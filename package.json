@@ -1,6 +1,6 @@
 {
   "name": "react-native-headless-tour",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Headless multi-instance tour/onboarding library for React Native",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

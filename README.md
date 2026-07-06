@@ -59,6 +59,7 @@ export function HomeScreen() {
   return (
     <TourProvider
       tourId="onboarding"
+      steps={['welcome', 'profile']}
       onStart={() => console.log('tour started')}
       onStepChange={(step) => console.log('step', step)}
       onComplete={() => console.log('tour done')}
@@ -69,14 +70,13 @@ export function HomeScreen() {
   );
 }
 
-// 2. Register elements as tour steps
+// 2. Register elements as tour steps — stepId must match an entry in TourProvider's `steps` array
 function MyContent() {
   return (
     <View>
       <TourStep
         tourId="onboarding"
         stepId="welcome"
-        order={1}
         metadata={{ title: 'Welcome!', description: 'This is your home screen.' }}
       >
         <TouchableOpacity onPress={handlePress}>
@@ -87,7 +87,6 @@ function MyContent() {
       <TourStep
         tourId="onboarding"
         stepId="profile"
-        order={2}
         metadata={{ title: 'Your profile', description: 'Tap here to edit your info.' }}
       >
         <View>
@@ -177,7 +176,6 @@ interface StepMeta {
 <TourStep<StepMeta>
   tourId="onboarding"
   stepId="welcome"
-  order={1}
   metadata={{ title: 'Welcome', description: 'Start here.' }}
 >
   <View />
@@ -214,6 +212,7 @@ Registers a tour instance. Cleans up automatically on unmount.
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `tourId` | `string` | ✅ | Unique identifier for this tour |
+| `steps` | `string[]` | ✅ | Ordered list of stepIds — the sole source of truth for tour order. Independent of which `TourStep`s are currently mounted, so steps on a screen the user hasn't navigated to yet are still counted. |
 | `onStart` | `() => void` | | Called when `start()` is invoked |
 | `onStepChange` | `(step: number) => void` | | Called on each step advance (0-based index) |
 | `onComplete` | `() => void` | | Called after the last step |
@@ -228,8 +227,7 @@ Wraps a native element, measures its position, and registers it in the tour. Ren
 | Prop | Type | Required | Description |
 |---|---|---|---|
 | `tourId` | `string` | ✅ | Which tour this step belongs to |
-| `stepId` | `string` | ✅ | Unique ID within the tour |
-| `order` | `number` | ✅ | Step sequence (sorted at `start()` time) |
+| `stepId` | `string` | ✅ | Must match one entry in the owning `TourProvider`'s `steps` array |
 | `metadata` | `TMeta` | ✅ | Free-form data (title, description, etc.) |
 | `children` | `ReactElement` | ✅ | Exactly one native host element |
 
@@ -300,7 +298,7 @@ if (!activeStepData?.layout) return null;
 
 ## Step ordering
 
-Steps are sorted by `order` when `start()` is called — not when they register. This means steps can mount at different times (lazy screens, conditional rendering) and the order will still be respected.
+The `steps` array passed to `<TourProvider>` is the sole source of truth for step order. Steps are toured through in the order they appear in this array, regardless of when `TourStep` components mount or unmount. This means you can have steps on screens the user hasn't visited yet, and they'll still be counted in the total and ordered correctly.
 
 ---
 
