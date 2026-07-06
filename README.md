@@ -7,6 +7,12 @@
 
 ---
 
+## Upgrading from 0.1.x
+
+`TourProvider` now requires a `steps: string[]` prop — the ordered list of stepIds for the tour, declared upfront. `TourStep` no longer takes an `order` prop; position comes from where the stepId appears in `TourProvider`'s `steps` array instead. This fixes tours that span multiple screens, where a step's target may not be mounted yet when the tour starts.
+
+---
+
 ## Why headless?
 
 Most tour libraries force their own tooltips, arrows, and modals onto your app. This library does none of that. It measures your elements, tracks which step is active, and hands you the screen coordinates — you render whatever you want on top.
@@ -150,10 +156,10 @@ Each `tourId` is its own isolated instance. Providers, steps, and hooks with dif
 
 ```tsx
 // Screen A
-<TourProvider tourId="onboarding">...</TourProvider>
+<TourProvider tourId="onboarding" steps={['welcome', 'profile']}>...</TourProvider>
 
 // Screen B (different screen, different tour)
-<TourProvider tourId="checkout">...</TourProvider>
+<TourProvider tourId="checkout" steps={['cart', 'payment']}>...</TourProvider>
 
 // Hook reads only its own tour
 const onboarding = useTour('onboarding');
@@ -263,7 +269,6 @@ interface TourControls {
 ```typescript
 interface TourStep<TMeta extends Record<string, unknown>> {
   id: string;
-  order: number;
   metadata: TMeta;
   layout: StepLayout | null;  // null until first layout measurement
 }
