@@ -21,7 +21,6 @@ function mergeRefs<T>(...refs: Array<Ref<T> | undefined | null>): RefCallback<T>
 export function TourStep<TMeta extends Record<string, unknown> = Record<string, unknown>>({
   tourId,
   stepId,
-  order,
   metadata,
   children,
 }: TourStepProps<TMeta>): ReactElement {
@@ -38,13 +37,13 @@ export function TourStep<TMeta extends Record<string, unknown> = Record<string, 
   useEffect(() => {
     registry.registerStep(
       tourId,
-      { id: stepId, order, metadata: metadata as Record<string, unknown>, layout: null },
+      { id: stepId, metadata: metadata as Record<string, unknown>, layout: null },
       ref,
     );
     return () => {
       registry.unregisterStep(tourId, stepId);
     };
-  }, [tourId, stepId, order, metadata]);
+  }, [tourId, stepId, metadata]);
 
   const existingOnLayout: ((e: LayoutChangeEvent) => void) | undefined =
     children.props.onLayout;

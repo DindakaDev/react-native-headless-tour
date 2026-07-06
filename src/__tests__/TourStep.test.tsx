@@ -32,20 +32,20 @@ afterEach(() => {
 
 it('calls registerStep on mount', () => {
   render(
-    <TourStep tourId="tour-a" stepId="s1" order={1} metadata={{ title: 'Hello' }}>
+    <TourStep tourId="tour-a" stepId="s1" metadata={{ title: 'Hello' }}>
       <View testID="child" />
     </TourStep>,
   );
   expect(registry.registerStep).toHaveBeenCalledWith(
     'tour-a',
-    { id: 's1', order: 1, metadata: { title: 'Hello' }, layout: null },
+    { id: 's1', metadata: { title: 'Hello' }, layout: null },
     expect.objectContaining({ current: expect.anything() }),
   );
 });
 
 it('calls unregisterStep on unmount', () => {
   const { unmount } = render(
-    <TourStep tourId="tour-a" stepId="s1" order={1} metadata={{}}>
+    <TourStep tourId="tour-a" stepId="s1" metadata={{}}>
       <View testID="child" />
     </TourStep>,
   );
@@ -54,12 +54,9 @@ it('calls unregisterStep on unmount', () => {
 });
 
 it('calls updateLayout after onLayout fires', () => {
-  // In RNTL v12, getByTestId returns a ReactTestInstance while ref.current is the
-  // mocked View class instance — different objects. Spy on View.prototype so that
-  // ref.current.measureInWindow calls the mock that invokes the callback.
   const spy = jest.spyOn(View.prototype, 'measureInWindow').mockImplementation(mockMeasureInWindow);
   const { getByTestId } = render(
-    <TourStep tourId="tour-a" stepId="s1" order={1} metadata={{}}>
+    <TourStep tourId="tour-a" stepId="s1" metadata={{}}>
       <View testID="child" />
     </TourStep>,
   );
@@ -77,7 +74,7 @@ it('calls updateLayout after onLayout fires', () => {
 it('preserves existing onLayout callback on child', () => {
   const existingOnLayout = jest.fn();
   const { getByTestId } = render(
-    <TourStep tourId="tour-a" stepId="s1" order={1} metadata={{}}>
+    <TourStep tourId="tour-a" stepId="s1" metadata={{}}>
       <View testID="child" onLayout={existingOnLayout} />
     </TourStep>,
   );
@@ -90,7 +87,7 @@ it('preserves existing onLayout callback on child', () => {
 it('preserves existing ref on child', () => {
   const existingRef = createRef<View>();
   render(
-    <TourStep tourId="tour-a" stepId="s1" order={1} metadata={{}}>
+    <TourStep tourId="tour-a" stepId="s1" metadata={{}}>
       <View testID="child" ref={existingRef} />
     </TourStep>,
   );
@@ -99,7 +96,7 @@ it('preserves existing ref on child', () => {
 
 it('renders the child directly without extra wrapper', () => {
   const { getByText } = render(
-    <TourStep tourId="tour-a" stepId="s1" order={1} metadata={{}}>
+    <TourStep tourId="tour-a" stepId="s1" metadata={{}}>
       <View>
         <Text>label</Text>
       </View>

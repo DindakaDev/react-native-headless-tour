@@ -17,13 +17,13 @@ jest.mock('react-native', () => {
 });
 
 function setupTour(tourId: string) {
-  registry.registerTour(tourId, {});
+  registry.registerTour(tourId, {}, ['a', 'b']);
   const makeRef = () => {
     const ref = { current: { measureInWindow: jest.fn() } };
     return ref as any;
   };
-  registry.registerStep(tourId, { id: 'a', order: 1, metadata: { title: 'Step A' }, layout: null }, makeRef());
-  registry.registerStep(tourId, { id: 'b', order: 2, metadata: { title: 'Step B' }, layout: { x: 10, y: 20, width: 100, height: 50 } }, makeRef());
+  registry.registerStep(tourId, { id: 'a', metadata: { title: 'Step A' }, layout: null }, makeRef());
+  registry.registerStep(tourId, { id: 'b', metadata: { title: 'Step B' }, layout: { x: 10, y: 20, width: 100, height: 50 } }, makeRef());
   registry.updateLayout(tourId, 'a', { x: 5, y: 10, width: 80, height: 40 });
 }
 
@@ -101,9 +101,9 @@ it('refresh() calls registry.refresh', () => {
 });
 
 it('two hooks with different tourIds are independent', () => {
-  registry.registerTour('hook-tour', {});
-  registry.registerTour('other-tour', {});
-  registry.registerStep('hook-tour', { id: 'x', order: 1, metadata: {}, layout: null }, { current: { measureInWindow: jest.fn() } } as any);
+  registry.registerTour('hook-tour', {}, ['x']);
+  registry.registerTour('other-tour', {}, []);
+  registry.registerStep('hook-tour', { id: 'x', metadata: {}, layout: null }, { current: { measureInWindow: jest.fn() } } as any);
 
   const { result: r1 } = renderHook(() => useTour('hook-tour'));
   const { result: r2 } = renderHook(() => useTour('other-tour'));
