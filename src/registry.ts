@@ -7,11 +7,20 @@ interface TourState {
   isActive: boolean;
   currentIndex: number;
   orderedStepIds: string[];
+  currentStepInteracted: boolean;
 }
 
 export interface TourSnapshot {
   state: TourState;
   steps: Map<string, TourStep>;
+  clipBounds: StepLayout | null;
+}
+
+export function markInteracted(tourId: string): void {
+  const instance = tours.get(tourId);
+  if (!instance || !instance.state.isActive) return;
+  instance.state = { ...instance.state, currentStepInteracted: true };
+  notify(tourId);
 }
 
 interface TourInstance {
@@ -20,6 +29,7 @@ interface TourInstance {
   steps: Map<string, TourStep>;
   stepRefs: Map<string, RefObject<View>>;
   state: TourState;
+  clipBounds: StepLayout | null;
   snapshot: TourSnapshot | null;
 }
 
@@ -33,12 +43,19 @@ function getOrCreate(tourId: string): TourInstance {
       configuredSteps: [],
       steps: new Map(),
       stepRefs: new Map(),
-      state: { isActive: false, currentIndex: 0, orderedStepIds: [] },
+      state: { isActive: false, currentIndex: 0, orderedStepIds: [], currentStepInteracted: false },
+      clipBounds: null,
       snapshot: null,
     });
     listeners.set(tourId, new Set());
   }
   return tours.get(tourId)!;
+}
+
+export function setClipBounds(tourId: string, bounds: StepLayout | null): void {
+  const instance = getOrCreate(tourId);
+  instance.clipBounds = bounds;
+  notify(tourId);
 }
 
 function notify(tourId: string): void {
@@ -63,6 +80,7 @@ export function getSnapshot(tourId: string): TourSnapshot {
     instance.snapshot = {
       state: { ...instance.state },
       steps: new Map(instance.steps),
+      clipBounds: instance.clipBounds,
     };
   }
   return instance.snapshot;
@@ -114,7 +132,7 @@ export function updateLayout(
 export function start(tourId: string): void {
   const instance = tours.get(tourId);
   if (!instance) return;
-  instance.state = { isActive: true, currentIndex: 0, orderedStepIds: instance.configuredSteps };
+  instance.state = { isActive: true, currentIndex: 0, orderedStepIds: instance.configuredSteps, currentStepInteracted: false };
   instance.callbacks.onStart?.();
   notify(tourId);
 }
@@ -128,7 +146,7 @@ export function next(tourId: string): void {
     instance.state = { ...instance.state, isActive: false };
     instance.callbacks.onComplete?.();
   } else {
-    instance.state = { ...instance.state, currentIndex: nextIndex };
+    instance.state = { ...instance.state, currentIndex: nextIndex, currentStepInteracted: false };
     instance.callbacks.onStepChange?.(nextIndex);
   }
   notify(tourId);
@@ -138,7 +156,7 @@ export function previous(tourId: string): void {
   const instance = tours.get(tourId);
   if (!instance || !instance.state.isActive) return;
   const prevIndex = Math.max(0, instance.state.currentIndex - 1);
-  instance.state = { ...instance.state, currentIndex: prevIndex };
+  instance.state = { ...instance.state, currentIndex: prevIndex, currentStepInteracted: false };
   instance.callbacks.onStepChange?.(prevIndex);
   notify(tourId);
 }
@@ -150,13 +168,34 @@ export function stop(tourId: string): void {
   notify(tourId);
 }
 
+export function goTo(tourId: string, stepId: string): void {
+  const instance = tours.get(tourId);
+  if (!instance || !instance.state.isActive) return;
+  const index = instance.state.orderedStepIds.indexOf(stepId);
+  if (index === -1) return;
+  instance.state = { ...instance.state, currentIndex: index, currentStepInteracted: false };
+  instance.callbacks.onStepChange?.(index);
+  notify(tourId);
+}
+
+export function branch(tourId: string, stepIds: string[]): void {
+  const instance = tours.get(tourId);
+  if (!instance || !instance.state.isActive) return;
+  const { currentIndex, orderedStepIds } = instance.state;
+  const newOrderedStepIds = [...orderedStepIds.slice(0, currentIndex + 1), ...stepIds];
+  instance.state = { ...instance.state, orderedStepIds: newOrderedStepIds, currentStepInteracted: false };
+  notify(tourId);
+}
+
 export function refresh(tourId: string): void {
   const instance = tours.get(tourId);
   if (!instance) return;
   InteractionManager.runAfterInteractions(() => {
-    instance.stepRefs.forEach((ref, stepId) => {
-      ref.current?.measureInWindow((x, y, width, height) => {
-        updateLayout(tourId, stepId, { x, y, width, height });
+    requestAnimationFrame(() => {
+      instance.stepRefs.forEach((ref, stepId) => {
+        ref.current?.measureInWindow((x, y, width, height) => {
+          updateLayout(tourId, stepId, { x, y, width, height });
+        });
       });
     });
   });

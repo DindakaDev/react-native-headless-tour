@@ -29,6 +29,8 @@ Most tour libraries force their own tooltips, arrows, and modals onto your app. 
 - **Headless** — zero UI rendered by the library
 - **Automatic measurement** — step coordinates update on layout changes, orientation, and scroll
 - **Manual refresh** — call `refresh()` to re-measure all steps on demand
+- **Branching flows** — `goTo()` jumps to any step; `branch()` replaces the remaining flow at runtime
+- **Layout-aware** — `activeStepLayoutIsReady` tells you when an element is measured and on screen
 - **Fully typed** — generic `metadata` so your step data is strongly typed end-to-end
 - **Expo compatible** — works in Expo Go and Development Builds
 
@@ -249,16 +251,24 @@ Subscribes to a tour instance. Re-renders only when the relevant tour's state ch
 interface TourControls {
   // State
   isActive: boolean;
-  currentStep: number;        // 0-based index
+  currentStep: number;             // 0-based index
   totalSteps: number;
   activeStepData: TourStep | null;
+  activeStepLayoutIsReady: boolean; // true when element is measured and within screen bounds
+  activeStepRequiresInteraction: boolean;
+  activeStepInteracted: boolean;
 
-  // Controls
+  // Navigation
   start: () => void;
   next: () => void;
   previous: () => void;
   stop: () => void;
-  refresh: () => void;        // re-measures all registered steps
+  refresh: () => void;             // re-measures all registered steps
+  markInteracted: () => void;
+
+  // Branching
+  goTo: (stepId: string) => void;  // jump to a step in the configured steps array
+  branch: (stepIds: string[]) => void; // replace remaining steps with a new sequence
 }
 ```
 
@@ -298,6 +308,75 @@ Coordinates are relative to the window (screen), suitable for `position: 'absolu
 ```tsx
 if (!activeStepData?.layout) return null;
 ```
+
+---
+
+## Step ordering
+
+The `steps` array passed to `<TourProvider>` is the sole source of truth for step order. Steps are toured through in the order they appear in this array, regardless of when `TourStep` components mount or unmount. This means you can have steps on screens the user hasn't visited yet, and they'll still be counted in the total and ordered correctly.
+
+---
+
+## Branching flows
+
+For tours that need to follow different paths based on user decisions, use `goTo` or `branch`.
+
+### `goTo(stepId)` — jump within a fixed steps array
+
+Use when all possible steps are known upfront. Define all of them in `TourProvider`'s `steps`, then jump to the right one:
+
+```tsx
+const { goTo } = useTour('onboarding');
+
+// After the user makes a choice on the current step:
+if (userSelectedPro) {
+  goTo('pro-feature-intro');   // must exist in TourProvider's steps array
+} else {
+  goTo('basic-feature-intro');
+}
+```
+
+### `branch(stepIds[])` — replace the remaining flow at runtime
+
+Use when the next steps depend on a runtime decision and you don't want to pre-declare all possible flows in `TourProvider`. `branch` discards all steps after the current one and inserts the new sequence:
+
+```tsx
+const { branch, next } = useTour('onboarding');
+
+// User completes step "choose-plan" — switch to the matching flow
+if (userChosePro) {
+  branch(['pro-billing', 'pro-features', 'pro-finish']);
+} else {
+  branch(['free-limits', 'free-finish']);
+}
+// next() will now follow the new sequence
+next();
+```
+
+`branch` is additive from the current step: previous steps are preserved, only future ones are replaced.
+
+### When to use each
+
+| | `goTo` | `branch` |
+|---|---|---|
+| Steps known at config time | ✅ | — |
+| Steps determined at runtime | — | ✅ |
+| Jumps backwards | ✅ | — |
+| Replaces remaining flow | — | ✅ |
+
+---
+
+## Layout readiness
+
+`activeStepLayoutIsReady` is `true` only when the active step's element has been measured **and** its coordinates fall within the visible screen bounds. Use it to avoid showing your tooltip before the element is positioned, or when the element belongs to a screen that is mounted in the navigation stack but not currently visible:
+
+```tsx
+const { isActive, activeStepLayoutIsReady } = useTour('onboarding');
+
+if (!isActive || !activeStepLayoutIsReady) return null;
+```
+
+This is particularly useful in stack navigators (e.g. Expo Router, React Navigation) where previous screens stay mounted — their `TourStep` elements remain registered with stale off-screen coordinates until the screen regains focus.
 
 ---
 

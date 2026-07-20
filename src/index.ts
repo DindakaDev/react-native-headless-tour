@@ -1,5 +1,6 @@
 export { TourProvider } from './TourProvider';
 export { TourStep } from './TourStep';
+export { TourSpotlight } from './TourSpotlight';
 export { useTour } from './useTour';
 export type {
   StepLayout,
